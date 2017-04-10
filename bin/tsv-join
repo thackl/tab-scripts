@@ -7,16 +7,19 @@ use Getopt::Long;
 use Data::Dumper;
 
 GetOptions (
-    "1=i" => \(my $akey = 1),
-    "2=i" => \(my $bkey = 1),
+    "a=i" => \(my $akey = 1),
+    "b=i" => \(my $bkey = 1),
     "m|omit-unmatched!" => \(my $omit_unmatched = 0),
     "help|h!" => \(my $opt_help),
 ) or die("Error in command line arguments\n");
 
 if ($opt_help || @ARGV==0){
-    print
-        "Usage:\n".
-        "tsv-join [-options] A.tsv B.tsv";
+    print "Usage: tsv-join [options] A.tsv B.tsv\n";
+    printf " %-19s  %s\n", "-a", "A match column [1]";
+    printf " %-19s  %s\n", "-b", "B match column [1]";
+    printf " %-19s  %s\n", "-m/--omit-unmatched", "omit A columns unmatched in B [FALSE]";
+    printf " %-19s  %s\n", "-h/--help", "show this help";
+    exit 0;
 }
 
 open(A, $ARGV[0]) or die $!;
@@ -84,5 +87,5 @@ close(A);
 
 printf STDERR "%-18s %10d\n", "matched rows:", $abcount;
 printf STDERR "%-18s %10d\n", "reported rows:", $ocount; 
-printf STDERR "%-18s %10d (%s)\n", "unmatched rows A:", $acount-$abcount, $omit_unmatched ? "omitted" : "included";
+printf STDERR "%-18s %10d (%s)\n", "unmatched rows A:", $acount-$abcount, $omit_unmatched ? "omitted" : "reported";
 printf STDERR "%-18s %10d (%s)\n", "unmatched rows B:", $bcount-$abcount, "always omitted";
