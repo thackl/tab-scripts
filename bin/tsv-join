@@ -1,0 +1,88 @@
+#!/usr/bin/env perl
+# Created: 09 Apr 2017
+# Author: Thomas Hackl, thackl@lim4.de
+use warnings;
+use strict;
+use Getopt::Long;
+use Data::Dumper;
+
+GetOptions (
+    "1=i" => \(my $akey = 1),
+    "2=i" => \(my $bkey = 1),
+    "m|omit-unmatched!" => \(my $omit_unmatched = 0),
+    "help|h!" => \(my $opt_help),
+) or die("Error in command line arguments\n");
+
+if ($opt_help || @ARGV==0){
+    print
+        "Usage:\n".
+        "tsv-join [-options] A.tsv B.tsv";
+}
+
+open(A, $ARGV[0]) or die $!;
+open(B, $ARGV[1]) or die $!;
+
+my %B;
+my $bfields;
+
+while (<B>) {
+    chomp();
+    my @b = split("\t", $_);
+    if (defined($bfields)) {
+        die "unequal number of fields" if $bfields != @b;
+    }else {
+        $bfields = @b;   
+    }
+    #print "0..".($bkey-1)."$bkey..$#b\n";
+    #print join("\t", @b[0..($bkey-2), $bkey..$#b]), "\n";
+    my $k = $b[$bkey-1];
+    die "empty key field" unless defined($k) && length($k);
+    die "non-uniq key $k\n" if exists $B{$k};
+    $B{$k} = join("\t", @b[0..($bkey-2), $bkey..$#b]);
+}
+close(B);
+
+#print Dumper(\%B);
+
+my $bempty = "\t" x $bfields;
+my $bcount = keys %B;
+
+my $afields;
+my $acount = 0;
+my $abcount = 0;
+my $ocount = 0;
+
+while (<A>) {
+    chomp();
+    my @a = split("\t", $_);
+
+    $acount++;
+    
+    if (defined($afields)) {
+        die "unequal number of fields" if $afields != @a;
+    }else {
+        $afields = @a;   
+    }
+
+    my $k = $a[$akey-1];
+    die "empty key field" unless defined($k) && length($k);
+    #die "non-uniq key $k\n" if exists $B{$k};
+    my $v;
+    if (exists($B{$k})){
+        $abcount++;
+        $v = $B{$k}
+    }else{
+        $omit_unmatched && next;
+        $v = $bempty;
+    }
+    $ocount++;
+    print join("\t", $_, $v),"\n";
+    
+}
+
+close(A);
+
+printf STDERR "%-18s %10d\n", "matched rows:", $abcount;
+printf STDERR "%-18s %10d\n", "reported rows:", $ocount; 
+printf STDERR "%-18s %10d (%s)\n", "unmatched rows A:", $acount-$abcount, $omit_unmatched ? "omitted" : "included";
+printf STDERR "%-18s %10d (%s)\n", "unmatched rows B:", $bcount-$abcount, "always omitted";
