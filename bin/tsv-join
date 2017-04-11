@@ -10,7 +10,9 @@ GetOptions (
     "a=i" => \(my $akey = 1),
     "b=i" => \(my $bkey = 1),
     "m|omit-unmatched!" => \(my $omit_unmatched = 0),
+    "n|NA-string=s" => \(my $NA = ''),
     "help|h!" => \(my $opt_help),
+    "debug|D!" => \(my $debug),
 ) or die("Error in command line arguments\n");
 
 if ($opt_help || @ARGV==0){
@@ -18,7 +20,9 @@ if ($opt_help || @ARGV==0){
     printf " %-19s  %s\n", "-a", "A match column [1]";
     printf " %-19s  %s\n", "-b", "B match column [1]";
     printf " %-19s  %s\n", "-m/--omit-unmatched", "omit A columns unmatched in B [FALSE]";
+    printf " %-19s  %s\n", "-n/--NA-string", "string for emtpy fields ['']";
     printf " %-19s  %s\n", "-h/--help", "show this help";
+    printf " %-19s  %s\n", "-D/--debug", "show debug messages";
     exit 0;
 }
 
@@ -41,13 +45,13 @@ while (<B>) {
     my $k = $b[$bkey-1];
     die "empty key field" unless defined($k) && length($k);
     die "non-uniq key $k\n" if exists $B{$k};
-    $B{$k} = join("\t", @b[0..($bkey-2), $bkey..$#b]);
+    $B{$k} = join("\t", '', @b[0..($bkey-2), $bkey..$#b]);
 }
 close(B);
 
-#print Dumper(\%B);
+$debug && print STDERR Dumper(\%B);
 
-my $bempty = "\t" x $bfields;
+my $bempty = ("\t".$NA) x ($bfields-1);
 my $bcount = keys %B;
 
 my $afields;
@@ -70,16 +74,16 @@ while (<A>) {
     my $k = $a[$akey-1];
     die "empty key field" unless defined($k) && length($k);
     #die "non-uniq key $k\n" if exists $B{$k};
-    my $v;
+    my $bv;
     if (exists($B{$k})){
         $abcount++;
-        $v = $B{$k}
+        $bv = $B{$k}
     }else{
         $omit_unmatched && next;
-        $v = $bempty;
+        $bv = $bempty;
     }
     $ocount++;
-    print join("\t", $_, $v),"\n";
+    print $_, $bv,"\n";
     
 }
 
