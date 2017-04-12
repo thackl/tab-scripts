@@ -3,13 +3,15 @@
 # Author: Thomas Hackl, thackl@lim4.de
 use warnings;
 use strict;
-use Getopt::Long;
+use Getopt::Long  qw(:config no_ignore_case bundling);
 use Data::Dumper;
 
 GetOptions (
     "a=i" => \(my $akey = 1),
     "b=i" => \(my $bkey = 1),
     "m|omit-unmatched!" => \(my $omit_unmatched = 0),
+    "H|header!" => \(my $with_header = 0),
+    "d|duplicates!" => \(my $duplicates = 0),
     "n|NA-string=s" => \(my $NA = ''),
     "help|h!" => \(my $opt_help),
     "debug|D!" => \(my $debug),
@@ -19,8 +21,10 @@ if ($opt_help || @ARGV==0){
     print "Usage: tsv-join [options] A.tsv B.tsv\n";
     printf " %-19s  %s\n", "-a", "A match column [1]";
     printf " %-19s  %s\n", "-b", "B match column [1]";
+    printf " %-19s  %s\n", "-H/--header", "First row in A&B is header [FALSE]";
+    printf " %-19s  %s\n", "-d/--duplicates", "Allow duplicated keys in B, report every combination [FALSE]";
     printf " %-19s  %s\n", "-m/--omit-unmatched", "omit A columns unmatched in B [FALSE]";
-    printf " %-19s  %s\n", "-n/--NA-string", "string for emtpy fields ['']";
+    printf " %-19s  %s\n", "-n/--NA-string", "string for added emtpy fields ['']";
     printf " %-19s  %s\n", "-h/--help", "show this help";
     printf " %-19s  %s\n", "-D/--debug", "show debug messages";
     exit 0;
@@ -31,6 +35,16 @@ open(B, $ARGV[1]) or die $!;
 
 my %B;
 my $bfields;
+my $bheader;
+my $bcount = 0;
+
+if ($with_header){
+    my $l = <B>;
+    chomp($l);
+    my @b = split("\t", $l);
+    $bfields = @b;
+    $bheader = join("\t", '', @b[0..($bkey-2), $bkey..$#b]);
+}
 
 while (<B>) {
     chomp();
@@ -44,20 +58,29 @@ while (<B>) {
     #print join("\t", @b[0..($bkey-2), $bkey..$#b]), "\n";
     my $k = $b[$bkey-1];
     die "empty key field" unless defined($k) && length($k);
-    die "non-uniq key $k\n" if exists $B{$k};
-    $B{$k} = join("\t", '', @b[0..($bkey-2), $bkey..$#b]);
+    die "non-uniq key $k in <B>\n" if !$duplicates && exists $B{$k};
+    $bcount++;
+    push @{$B{$k}}, join("\t", '', @b[0..($bkey-2), $bkey..$#b]);
 }
 close(B);
 
 $debug && print STDERR Dumper(\%B);
 
 my $bempty = ("\t".$NA) x ($bfields-1);
-my $bcount = keys %B;
 
 my $afields;
 my $acount = 0;
 my $abcount = 0;
+my $aocount = 0;
 my $ocount = 0;
+
+if ($with_header){
+    my $aheader = <A>;
+    chomp($aheader);
+    my @a = split("\t", $aheader);
+    $afields = @a;
+    print $aheader, $bheader, "\n";
+}
 
 while (<A>) {
     chomp();
@@ -76,18 +99,21 @@ while (<A>) {
     #die "non-uniq key $k\n" if exists $B{$k};
     my $bv;
     if (exists($B{$k})){
-        $abcount++;
-        $bv = $B{$k}
+        foreach $bv (@{$B{$k}}) {
+            $abcount++;
+            print $_, $bv,"\n";
+        }
     }else{
         $omit_unmatched && next;
         $bv = $bempty;
+        $aocount++;
+        print $_, $bv,"\n";
     }
-    $ocount++;
-    print $_, $bv,"\n";
-    
 }
 
 close(A);
+
+$ocount = $abcount + $aocount;
 
 printf STDERR "%-18s %10d\n", "matched rows:", $abcount;
 printf STDERR "%-18s %10d\n", "reported rows:", $ocount; 
