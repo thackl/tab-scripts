@@ -3,13 +3,14 @@
 # Author: Thomas Hackl, thackl@lim4.de
 use warnings;
 use strict;
-use Getopt::Long;
+use Getopt::Long  qw(:config no_ignore_case bundling);
 use Data::Dumper;
 
 GetOptions (
     "a=i" => \(my $akey = 1),
     "b=i" => \(my $bkey = 1),
     "m|omit-unmatched!" => \(my $omit_unmatched = 0),
+    "H|header!" => \(my $with_header = 0),
     "n|NA-string=s" => \(my $NA = ''),
     "help|h!" => \(my $opt_help),
     "debug|D!" => \(my $debug),
@@ -19,8 +20,9 @@ if ($opt_help || @ARGV==0){
     print "Usage: tsv-join [options] A.tsv B.tsv\n";
     printf " %-19s  %s\n", "-a", "A match column [1]";
     printf " %-19s  %s\n", "-b", "B match column [1]";
+    printf " %-19s  %s\n", "-H/--header", "First row in A&B is header [FALSE]";
     printf " %-19s  %s\n", "-m/--omit-unmatched", "omit A columns unmatched in B [FALSE]";
-    printf " %-19s  %s\n", "-n/--NA-string", "string for emtpy fields ['']";
+    printf " %-19s  %s\n", "-n/--NA-string", "string for added emtpy fields ['']";
     printf " %-19s  %s\n", "-h/--help", "show this help";
     printf " %-19s  %s\n", "-D/--debug", "show debug messages";
     exit 0;
@@ -31,6 +33,15 @@ open(B, $ARGV[1]) or die $!;
 
 my %B;
 my $bfields;
+my $bheader;
+
+if ($with_header){
+    my $l = <B>;
+    chomp($l);
+    my @b = split("\t", $l);
+    $bfields = @b;
+    $bheader = join("\t", '', @b[0..($bkey-2), $bkey..$#b]);
+}
 
 while (<B>) {
     chomp();
@@ -58,6 +69,14 @@ my $afields;
 my $acount = 0;
 my $abcount = 0;
 my $ocount = 0;
+
+if ($with_header){
+    my $aheader = <A>;
+    chomp($aheader);
+    my @a = split("\t", $aheader);
+    $afields = @a;
+    print $aheader, $bheader, "\n";
+}
 
 while (<A>) {
     chomp();
